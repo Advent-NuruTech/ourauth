@@ -14,6 +14,8 @@ export type AuditEvent =
   | "oauth.login"
   | "developer.signup"
   | "developer.login"
+  | "developer.email_changed"
+  | "developer.password_changed"
   | "app.created"
   | "app.key_rotated"
   | "role.created"

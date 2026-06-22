@@ -21,6 +21,11 @@ import {
   type Environment,
   type InitialKeys,
 } from "@/lib/ants/apps";
+import {
+  updateDeveloperEmail,
+  updateDeveloperPassword,
+} from "@/lib/ants/developers";
+import { validatePasswordStrength, isPasswordBreached } from "@/lib/ants/crypto/password";
 import { AntsError, Errors } from "@/lib/ants/errors";
 import { audit } from "@/lib/ants/audit";
 
@@ -148,6 +153,61 @@ export async function updateSettingsAction(
     await updateApplication(app.id, { name: name || undefined, settings });
     revalidatePath(`/dashboard/apps/${appId}`);
     return { ok: true };
+  } catch (err) {
+    return { error: message(err) };
+  }
+}
+
+// ── Account (the signed-in developer) ──────────────────────────────────────────
+
+export type AccountState = { error?: string; success?: string };
+
+export async function updateEmailAction(
+  _prev: AccountState,
+  formData: FormData,
+): Promise<AccountState> {
+  try {
+    const dev = await requireDeveloper();
+    const newEmail = String(formData.get("email") ?? "").trim();
+    const currentPassword = String(formData.get("current_password") ?? "");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(newEmail)) {
+      throw Errors.invalidRequest("Enter a valid email address");
+    }
+    const updated = await updateDeveloperEmail({
+      id: dev.id,
+      newEmail,
+      currentPassword: currentPassword || null,
+    });
+    audit("developer.email_changed", { metadata: { developer_id: dev.id } });
+    revalidatePath("/dashboard", "layout");
+    return { success: `Email updated to ${updated.email}.` };
+  } catch (err) {
+    return { error: message(err) };
+  }
+}
+
+export async function updatePasswordAction(
+  _prev: AccountState,
+  formData: FormData,
+): Promise<AccountState> {
+  try {
+    const dev = await requireDeveloper();
+    const currentPassword = String(formData.get("current_password") ?? "");
+    const newPassword = String(formData.get("new_password") ?? "");
+    const confirmPassword = String(formData.get("confirm_password") ?? "");
+    if (newPassword !== confirmPassword) throw Errors.invalidRequest("New passwords do not match");
+    const weak = validatePasswordStrength(newPassword);
+    if (weak) throw Errors.invalidRequest(weak);
+    if (await isPasswordBreached(newPassword)) {
+      throw Errors.invalidRequest("This password has appeared in a data breach. Choose another.");
+    }
+    await updateDeveloperPassword({
+      id: dev.id,
+      currentPassword: currentPassword || null,
+      newPassword,
+    });
+    audit("developer.password_changed", { metadata: { developer_id: dev.id } });
+    return { success: "Password updated." };
   } catch (err) {
     return { error: message(err) };
   }

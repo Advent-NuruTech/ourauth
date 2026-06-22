@@ -94,6 +94,77 @@ export async function authenticateDeveloper(
   };
 }
 
+/** Does this developer have a password set? (Google-only accounts do not.) */
+export async function developerHasPassword(id: string): Promise<boolean> {
+  const rows = await sql<{ password_hash: string | null }[]>`
+    select password_hash from developers where id = ${id}
+  `;
+  return Boolean(rows[0]?.password_hash);
+}
+
+/**
+ * Change a developer's email. When the account has a password we re-authenticate
+ * with it first (defense for a sensitive change). The new address must be unused;
+ * we reset email_verified since a fresh address is, by definition, unverified.
+ */
+export async function updateDeveloperEmail(input: {
+  id: string;
+  newEmail: string;
+  currentPassword: string | null;
+}): Promise<Developer> {
+  const email = input.newEmail.toLowerCase().trim();
+  const rows = await sql<(Developer & { password_hash: string | null })[]>`
+    select id, email, name, status, created_at, password_hash from developers where id = ${input.id}
+  `;
+  const dev = rows[0];
+  if (!dev) throw Errors.notFound("Account not found");
+  if (dev.password_hash) {
+    const ok = input.currentPassword
+      ? await verifyPassword(dev.password_hash, input.currentPassword)
+      : false;
+    if (!ok) throw Errors.invalidRequest("Current password is incorrect");
+  }
+  if (email === String(dev.email).toLowerCase()) {
+    throw Errors.invalidRequest("That is already your email address");
+  }
+  const taken = await sql`select 1 from developers where email = ${email} and id <> ${input.id}`;
+  if (taken.length > 0) throw Errors.conflict("An account with this email already exists");
+  const updated = await sql<Developer[]>`
+    update developers
+       set email = ${email}, email_verified = false, updated_at = now()
+     where id = ${input.id}
+     returning id, email, name, status, created_at
+  `;
+  return updated[0];
+}
+
+/**
+ * Change a developer's password. Re-authenticates with the current password when
+ * one is set; Google-only accounts (no password yet) may set an initial one.
+ * Strength/breach checks are enforced by the caller before this runs.
+ */
+export async function updateDeveloperPassword(input: {
+  id: string;
+  currentPassword: string | null;
+  newPassword: string;
+}): Promise<void> {
+  const rows = await sql<{ password_hash: string | null }[]>`
+    select password_hash from developers where id = ${input.id}
+  `;
+  const row = rows[0];
+  if (!row) throw Errors.notFound("Account not found");
+  if (row.password_hash) {
+    const ok = input.currentPassword
+      ? await verifyPassword(row.password_hash, input.currentPassword)
+      : false;
+    if (!ok) throw Errors.invalidRequest("Current password is incorrect");
+  }
+  const password_hash = await hashPassword(input.newPassword);
+  await sql`
+    update developers set password_hash = ${password_hash}, updated_at = now() where id = ${input.id}
+  `;
+}
+
 /** Issue a management bearer token for a developer (12h). */
 export async function issueDeveloperToken(developerId: string): Promise<string> {
   const { kid, privateKey } = await getActiveSigningKey();

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { requireDeveloper } from "@/lib/ants/dashboard/session";
 import { getActiveEnvironment } from "@/lib/ants/dashboard/environment";
-import { signOutAction } from "../(auth)/actions";
 import { EnvSwitch } from "./env-switch";
+import { ProfileMenu } from "./profile-menu";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const dev = await requireDeveloper();
@@ -32,12 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <Link href="/docs" className="hidden text-muted hover:text-foreground sm:inline">
               Docs
             </Link>
-            <span className="hidden text-muted lg:inline">{dev.email}</span>
-            <form action={signOutAction}>
-              <button className="rounded-xl border border-border px-3 py-1.5 font-medium transition hover:bg-black/[0.04] dark:hover:bg-white/[0.06]">
-                Sign out
-              </button>
-            </form>
+            <ProfileMenu email={dev.email} name={dev.name} />
           </div>
         </div>
         {/* Inline environment context strip. */}
