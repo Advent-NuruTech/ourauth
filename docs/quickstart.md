@@ -35,7 +35,7 @@ allow-list for browser calls; `redirect_uris` is the allow-list for OAuth return
 import { AntsClient } from "@/sdk/ants-client";
 
 const ants = new AntsClient({
-  baseUrl: "https://auth.example.com",   // your Ants deployment
+  baseUrl: "https://ants.adventnurutech.xyz",   // your Ants deployment
   publishableKey: "pk_live_…",
 });
 
@@ -70,7 +70,7 @@ Verify Ants access tokens **offline** (no call back to Ants) using the JWKS:
 import { AntsVerifier } from "@/sdk/ants-server";
 
 const ants = new AntsVerifier({
-  jwksUrl: "https://auth.example.com/.well-known/jwks.json",
+  jwksUrl: "https://ants.adventnurutech.xyz/.well-known/jwks.json",
   applicationId: "<your application id>",   // tokens' `aud`
 });
 

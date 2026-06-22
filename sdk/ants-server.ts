@@ -6,7 +6,7 @@
  *   import { AntsVerifier } from "@/sdk/ants-server";
  *   const ants = new AntsVerifier({
  *     issuer: "ants",
- *     jwksUrl: "https://auth.example.com/.well-known/jwks.json",
+ *     jwksUrl: "https://ants.adventnurutech.xyz/.well-known/jwks.json",
  *     applicationId: "your-app-id",
  *   });
  *   const claims = await ants.verify(bearerToken); // throws if invalid
@@ -88,7 +88,7 @@ export type AntsManagementOptions = {
  * permissions are entirely defined by your application — Ants ships none.
  *
  *   const ants = new AntsManagement({
- *     baseUrl: "https://auth.example.com",
+ *     baseUrl: "https://ants.adventnurutech.xyz",
  *     applicationId: "…",
  *     secretKey: process.env.ANTS_SECRET_KEY!,
  *   });

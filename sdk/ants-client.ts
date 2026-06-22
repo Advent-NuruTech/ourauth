@@ -3,7 +3,7 @@
  *
  *   import { AntsClient } from "@/sdk/ants-client";
  *   const ants = new AntsClient({
- *     baseUrl: "https://auth.example.com",
+ *     baseUrl: "https://ants.adventnurutech.xyz",
  *     publishableKey: "pk_live_xxx",
  *   });
  *   await ants.signUp({ email, password });

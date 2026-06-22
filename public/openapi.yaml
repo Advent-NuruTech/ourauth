@@ -17,6 +17,8 @@ info:
     JWKS at `/.well-known/jwks.json`. Refresh tokens are opaque and rotate on every
     use (reuse is detected and revokes the whole session family).
 servers:
+  - url: https://ants.adventnurutech.xyz
+    description: Production
   - url: http://localhost:3000
     description: Local
 tags:

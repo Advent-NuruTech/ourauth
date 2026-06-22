@@ -13,7 +13,7 @@ const FEATURES: [string, string, string][] = [
 const CODE = `import { AntsClient } from "@ants/client";
 
 const ants = new AntsClient({
-  baseUrl: "https://auth.example.com",
+  baseUrl: "https://ants.adventnurutech.xyz",
   publishableKey: "pk_test_…",
 });
 
