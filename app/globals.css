@@ -1,26 +1,118 @@
 @import "tailwindcss";
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Ants design system — tokens. A calm, professional surface palette with an
+   indigo brand accent. Environment accents (live = emerald, test = amber) are
+   applied per-console via the `data-env` attribute so the two modes are never
+   visually confusable.
+   ────────────────────────────────────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fbfbfd;
+  --surface: #ffffff;
+  --foreground: #18181b;
+  --muted: #71717a;
+  --border: rgba(9, 9, 11, 0.08);
+  --border-strong: rgba(9, 9, 11, 0.14);
+
+  --brand: #4f46e5;
+  --brand-hover: #4338ca;
+  --brand-foreground: #ffffff;
+
+  /* Environment accent — defaults to test (amber); overridden by [data-env]. */
+  --env: #d97706;
+  --env-soft: rgba(217, 119, 6, 0.12);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+[data-env="live"] {
+  --env: #059669;
+  --env-soft: rgba(5, 150, 105, 0.12);
+}
+[data-env="test"] {
+  --env: #d97706;
+  --env-soft: rgba(217, 119, 6, 0.12);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #08080a;
+    --surface: #101013;
+    --foreground: #f4f4f5;
+    --muted: #a1a1aa;
+    --border: rgba(255, 255, 255, 0.10);
+    --border-strong: rgba(255, 255, 255, 0.18);
+
+    --brand: #818cf8;
+    --brand-hover: #6366f1;
+    --brand-foreground: #0b0b0f;
+
+    --env: #fbbf24;
+    --env-soft: rgba(251, 191, 36, 0.16);
   }
+  [data-env="live"] {
+    --env: #34d399;
+    --env-soft: rgba(52, 211, 153, 0.16);
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-brand: var(--brand);
+  --color-env: var(--env);
+  --font-sans: var(--font-sans-stack);
+  --font-mono: var(--font-mono-stack);
+}
+
+:root {
+  --font-sans-stack: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+  --font-mono-stack: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code",
+    Menlo, Consolas, monospace;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans-stack);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--brand) 24%, transparent);
+}
+
+/* Subtle entrance used by the environment switch + cards. */
+@keyframes ants-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.ants-fade-in {
+  animation: ants-fade-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes ants-grid-pan {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 40px 40px;
+  }
 }

@@ -1,0 +1,462 @@
+openapi: 3.1.0
+info:
+  title: Ants — Authentication as a Service
+  version: "1.0.0"
+  description: |
+    **Secured by Ants.** Multi-tenant authentication for your apps.
+
+    There are two surfaces:
+
+    - **Auth API** (`/api/v1/auth/*`) — called from your app (browser or backend).
+      Authenticated with a **publishable key** sent in the `X-Ants-Key` header.
+    - **Management API** (`/api/v1/apps/*`, `/api/v1/admin/*`) — manage developers,
+      apps and keys. Authenticated with a **developer management token** or a
+      **secret key** (`Authorization: Bearer ...`).
+
+    Access tokens are short-lived **Ed25519 JWTs**; verify them offline using the
+    JWKS at `/.well-known/jwks.json`. Refresh tokens are opaque and rotate on every
+    use (reuse is detected and revokes the whole session family).
+servers:
+  - url: http://localhost:3000
+    description: Local
+tags:
+  - name: Auth
+    description: End-user authentication (publishable key)
+  - name: OAuth
+    description: Social sign-in
+  - name: Management
+    description: Developer & application management
+  - name: Keys
+    description: Public keys
+components:
+  responses:
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Missing/invalid credentials or token
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Resource already exists
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  securitySchemes:
+    PublishableKey:
+      type: apiKey
+      in: header
+      name: X-Ants-Key
+      description: "Publishable key, e.g. pk_test_xxx"
+    BearerAccess:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: End-user access token (for /auth/me)
+    Management:
+      type: http
+      scheme: bearer
+      description: Developer management token or secret key (sk_...)
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string, example: invalid_credentials }
+            message: { type: string, example: Invalid email or password }
+            details: { type: object, additionalProperties: true }
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        email_verified: { type: boolean }
+        full_name: { type: string, nullable: true }
+        avatar_url: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+    Tokens:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        token_type: { type: string, example: Bearer }
+        expires_in: { type: integer, example: 600 }
+    AuthResult:
+      allOf:
+        - $ref: "#/components/schemas/Tokens"
+        - type: object
+          properties:
+            user: { $ref: "#/components/schemas/User" }
+paths:
+  /.well-known/jwks.json:
+    get:
+      tags: [Keys]
+      summary: JSON Web Key Set
+      description: Public Ed25519 keys for verifying access tokens offline.
+      responses:
+        "200":
+          description: JWKS
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys: { type: array, items: { type: object } }
+  /api/v1/auth/signup:
+    post:
+      tags: [Auth]
+      summary: Sign up with email & password
+      security: [{ PublishableKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                full_name: { type: string }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in with email & password
+      security: [{ PublishableKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResult" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/auth/token/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate tokens
+      description: Exchanges a refresh token for a new token pair. The old refresh token is invalidated.
+      security: [{ PublishableKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties: { refresh_token: { type: string } }
+      responses:
+        "200":
+          description: New tokens
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tokens" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Log out (revoke session)
+      security: [{ PublishableKey: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { refresh_token: { type: string } }
+      responses:
+        "200": { description: OK }
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get the current user
+      security: [{ PublishableKey: [], BearerAccess: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { user: { $ref: "#/components/schemas/User" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/auth/verify-email:
+    get:
+      tags: [Auth]
+      summary: Verify email (link)
+      parameters:
+        - in: query
+          name: token
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Verified }
+    post:
+      tags: [Auth]
+      summary: Verify email (programmatic)
+      security: [{ PublishableKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties: { token: { type: string } }
+      responses:
+        "200": { description: Verified }
+  /api/v1/auth/verify-email/resend:
+    post:
+      tags: [Auth]
+      summary: Resend verification email
+      security: [{ PublishableKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties: { email: { type: string, format: email } }
+      responses:
+        "200": { description: Accepted (no enumeration) }
+  /api/v1/auth/password/forgot:
+    post:
+      tags: [Auth]
+      summary: Request password reset
+      security: [{ PublishableKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties: { email: { type: string, format: email } }
+      responses:
+        "200": { description: Accepted (always succeeds; no enumeration) }
+  /api/v1/auth/password/reset:
+    post:
+      tags: [Auth]
+      summary: Reset password with token
+      security: [{ PublishableKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 8 }
+      responses:
+        "200": { description: Reset; all sessions revoked }
+  /api/v1/auth/oauth/google/start:
+    get:
+      tags: [OAuth]
+      summary: Start Google sign-in
+      description: Redirects (302) the browser to Google. Open in a top-level navigation.
+      parameters:
+        - in: query
+          name: key
+          required: true
+          schema: { type: string }
+          description: Publishable key
+        - in: query
+          name: redirect_to
+          required: true
+          schema: { type: string }
+          description: Allow-listed URL to return to; tokens are appended in the URL fragment.
+      responses:
+        "302": { description: Redirect to Google }
+  /api/v1/auth/oauth/google/callback:
+    get:
+      tags: [OAuth]
+      summary: Google OAuth callback
+      description: Handled by Ants. Redirects to your `redirect_to` with `#access_token=...&refresh_token=...`.
+      responses:
+        "302": { description: Redirect back to the app }
+  /api/v1/admin/signup:
+    post:
+      tags: [Management]
+      summary: Create a developer account
+      description: Gated by the server's ADMIN_SIGNUP_CODE.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, code]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                name: { type: string }
+                code: { type: string }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  developer: { type: object }
+                  management_token: { type: string }
+  /api/v1/admin/login:
+    post:
+      tags: [Management]
+      summary: Developer login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  developer: { type: object }
+                  management_token: { type: string }
+  /api/v1/apps:
+    get:
+      tags: [Management]
+      summary: List applications
+      security: [{ Management: [] }]
+      responses:
+        "200": { description: OK }
+    post:
+      tags: [Management]
+      summary: Create an application
+      description: Returns the initial publishable + secret keys ONCE.
+      security: [{ Management: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                environment: { type: string, enum: [live, test], default: test }
+                allowed_origins: { type: array, items: { type: string } }
+                redirect_uris: { type: array, items: { type: string } }
+      responses:
+        "201": { description: Created }
+  /api/v1/apps/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Management]
+      summary: Get an application
+      security: [{ Management: [] }]
+      responses:
+        "200": { description: OK }
+    patch:
+      tags: [Management]
+      summary: Update settings (origins, redirect URIs, Google provider, etc.)
+      security: [{ Management: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                allowed_origins: { type: array, items: { type: string } }
+                redirect_uris: { type: array, items: { type: string } }
+                require_email_verification: { type: boolean }
+                google:
+                  type: object
+                  properties:
+                    enabled: { type: boolean }
+                    client_id: { type: string }
+                    client_secret: { type: string }
+      responses:
+        "200": { description: OK }
+    delete:
+      tags: [Management]
+      summary: Delete an application
+      security: [{ Management: [] }]
+      responses:
+        "200": { description: Deleted }
+  /api/v1/apps/{id}/keys:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Management]
+      summary: List API keys (metadata only)
+      security: [{ Management: [] }]
+      responses:
+        "200": { description: OK }
+    post:
+      tags: [Management]
+      summary: Mint a new key (pk or sk)
+      security: [{ Management: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { type: { type: string, enum: [pk, sk] } }
+      responses:
+        "201": { description: Raw key returned once }
+  /api/v1/apps/{id}/users:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+      - in: query
+        name: search
+        schema: { type: string }
+      - in: query
+        name: limit
+        schema: { type: integer, default: 50, maximum: 200 }
+      - in: query
+        name: offset
+        schema: { type: integer, default: 0 }
+    get:
+      tags: [Management]
+      summary: List end users
+      security: [{ Management: [] }]
+      responses:
+        "200": { description: OK }

@@ -6,12 +6,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "keys:rotate": "tsx scripts/rotate-signing-key.ts"
   },
   "dependencies": {
+    "jose": "^5.9.6",
     "next": "16.2.9",
+    "postgres": "^3.4.5",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -21,6 +26,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
+    "tsx": "^4.19.2",
     "typescript": "^5"
   }
 }
